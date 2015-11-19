@@ -6,7 +6,7 @@ Created on Mon Jul 21 10:32:00 2014
 """
 name='Rodent Tracker'
 date='11/15/2015'
-base_dir = 'behavior'
+base_dir = 'rodentTracker'
 dependencies=['shapely', 'skimage', 'leastsqbound']
 
 menu_layout = {'Launch Rodent Tracker': ['rodentTracker', 'launchRodentTracker']}

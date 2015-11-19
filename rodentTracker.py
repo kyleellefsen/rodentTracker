@@ -157,7 +157,8 @@ class RodentTracker(QWidget):
             if self.attention_im is not None:
                 self.boolWindow.imageview.removeItem(self.attention_im)
             self.boolWindow.imageview.removeItem(self.scatter)
-        g.m.windows.remove(self)
+        if self in g.m.windows:
+            g.m.windows.remove(self)
         event.accept() # let the window close
         
 class AnalyzeThread(QThread):
