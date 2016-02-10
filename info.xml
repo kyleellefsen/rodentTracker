@@ -1,0 +1,25 @@
+<plugin name="Rodent Tracker">
+	<base_dir>
+		rodentTracker
+	</base_dir>
+	<date>
+		02/10/2016
+	</date>
+	<author>
+		Kyle Ellefsen
+	</author>
+	<description>
+		A Flika plugin for behavior analysis of rodents.
+	</description>
+	<url>
+		https://github.com/kyleellefsen/rodentTracker/archive/master.zip
+	</url>
+	<dependencies>
+		<dependency name='skimage'></dependency>
+		<dependency name='leastsqbound'></dependency>
+		<dependency name='shapely'></dependency>
+	</dependencies>
+	<menu_layout>
+		<action location="rodentTracker" function="launchRodentTracker">Launch Rodent Tracker</action>
+	</menu_layout>
+</plugin>
