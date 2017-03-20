@@ -4,22 +4,30 @@ Created on Tue Aug 05 15:41:02 2014
 
 @author: Kyle Ellefsen
 """
-from __future__ import (absolute_import, division,print_function, unicode_literals)
-from future.builtins import (bytes, dict, int, list, object, range, str, ascii, chr, hex, input, next, oct, open, pow, round, super, filter, map, zip)
-
 import numpy as np
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
-from PyQt4.QtCore import pyqtSignal as Signal
+from qtpy.QtWidgets import *
+from qtpy.QtGui import *
+from qtpy.QtCore import *
+from qtpy.QtCore import pyqtSignal as Signal
 import pyqtgraph as pg
 from pyqtgraph import plot, show
 from scipy.ndimage.measurements import center_of_mass
 from shapely.geometry import Point, LineString, MultiPoint, Polygon
 from skimage.draw import polygon
-from shapely.affinity import translate,rotate,scale
+from shapely.affinity import translate, rotate, scale
 from leastsqbound import leastsqbound
+from distutils.version import StrictVersion
 from .attention import getAttention
-import global_vars as g
+
+import flika
+try:
+    flika_version = flika.__version__
+except AttributeError:
+    flika_version = '0.0.0'
+if StrictVersion(flika_version) < StrictVersion('0.1.0'):
+    import global_vars as g
+else:
+    from flika import global_vars as g
 
 
 
@@ -34,7 +42,7 @@ class RodentTracker(QWidget):
     closeSignal=Signal()
     def __init__(self,boolWindow=None,parent=None):
         super(RodentTracker,self).__init__(parent) ## Create window with ImageView widget
-        g.m.rodentTracker=self
+        g.rodentTracker = self
         self.setWindowTitle('Rodent Tracker')
         self.setGeometry(QRect(422, 35, 222, 86))
         self.l = QVBoxLayout()
@@ -375,7 +383,13 @@ def getNosePoints(line,prevPoint):
         else:
             return end
 
-if __name__=='__main__':
+
+
+def watch_video():
+    url = 'https://youtu.be/y4IcD8Sv5Zg'
+    QDesktopServices.openUrl(QUrl(url))
+
+if __name__ == '__main__':
     from skimage.io import imread, imsave
     movie=imread('D:\\Desktop\\bwmouse.tif',plugin='tifffile').astype(np.float64)
     movie=np.squeeze(movie) #this gets rid of the meaningless 4th dimention in .stk files
@@ -388,8 +402,6 @@ if __name__=='__main__':
         image=movie[t]
         bodyLines[t],angle=getLine(image,angle)
     nosePoints[0]=getFirstNosePoint(movie[0],bodyLines[0])
-else:
-    import global_vars as g
 
     
 

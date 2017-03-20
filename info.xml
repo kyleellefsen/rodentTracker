@@ -21,5 +21,6 @@
 	</dependencies>
 	<menu_layout>
 		<action location="rodentTracker" function="launchRodentTracker">Launch Rodent Tracker</action>
+		<action location="rodentTracker" function="watch_video">Watch Video</action>
 	</menu_layout>
 </plugin>
