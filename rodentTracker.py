@@ -5,10 +5,11 @@ Created on Tue Aug 05 15:41:02 2014
 @author: Kyle Ellefsen
 """
 import numpy as np
+import os
 from qtpy.QtWidgets import *
 from qtpy.QtGui import *
 from qtpy.QtCore import *
-from qtpy.QtCore import pyqtSignal as Signal
+from qtpy import QtWidgets, QtGui, QtCore
 import pyqtgraph as pg
 from pyqtgraph import plot, show
 from scipy.ndimage.measurements import center_of_mass
@@ -39,7 +40,7 @@ def launchRodentTracker():
     return rodentTracker
 
 class RodentTracker(QWidget):
-    closeSignal=Signal()
+    closeSignal=QtCore.Signal()
     def __init__(self,boolWindow=None,parent=None):
         super(RodentTracker,self).__init__(parent) ## Create window with ImageView widget
         g.rodentTracker = self
@@ -47,20 +48,24 @@ class RodentTracker(QWidget):
         self.setGeometry(QRect(422, 35, 222, 86))
         self.l = QVBoxLayout()
         self.show()
-        self.analyzeButton=QPushButton('Analyze')
-        
-        self.status=QLabel("Press 'Analyze' to track rodent")
+        self.analyzeButton = QPushButton('Analyze')
+        self.status = QLabel("Press 'Analyze' to track rodent")
         self.analyzeButton.pressed.connect(self.analyze)
         self.l.addWidget(self.status)
         self.l.addWidget(self.analyzeButton)
         self.setLayout(self.l)
-        self.boolWindow=boolWindow
-        self.analysisDone=False
-        self.nosePoints=[None] # This will fill to be a list with all the different nose positions, one per frame
-        self.bodyLines=[None] # This will fill to be a list with all the different body positions, one per frame
-        self.attention_im=None
+        self.boolWindow = boolWindow
+        self.analysisDone = False
+        self.nosePoints = [None] # This will fill to be a list with all the different nose positions, one per frame
+        self.bodyLines = [None] # This will fill to be a list with all the different body positions, one per frame
+        self.attention_im = None
+        self.nosePointsArray = None
+
     def save(self):
-        print('Save not implemented')
+        self.nosePointsArray
+        g.alert("""Save not implemented. To access the data, in a console use the variables \n\ng.rodentTracker.nosePointsArray\ng.rodentTracker.headVectors """)
+
+
     def analyze(self):
         ## Set up items for displaying results
         
@@ -135,26 +140,26 @@ class RodentTracker(QWidget):
         self.plotTrajectoryButton=QPushButton('Plot Trajectory (of nose)')
         self.plotTrajectoryButton.pressed.connect(self.plotTrajectory)
         self.l.addWidget(self.plotTrajectoryButton)
-        self.plotAttentionButton=QPushButton('Show attention heat map')
+        self.plotAttentionButton = QPushButton('Show attention heat map')
         self.plotAttentionButton.pressed.connect(self.plotAttention)
         self.l.addWidget(self.plotAttentionButton)
-        self.saveButton=QPushButton('Save')
+        self.saveButton = QPushButton('Save')
         self.saveButton.pressed.connect(self.save)
         self.l.addWidget(self.saveButton)
-        self.analysisDone=True
+        self.analysisDone = True
         
     def plotTrajectory(self):
-        self.trajectoryPlot=plot(self.nosePointsArray)
-        plotitem=self.trajectoryPlot.getPlotItem()
+        self.trajectoryPlot = plot(self.nosePointsArray)
+        plotitem = self.trajectoryPlot.getPlotItem()
         plotitem.invertY()
         plotitem.update()
         
     def plotAttention(self):
-        self.attention=getAttention(self)
-        self.attention_im=pg.ImageItem(self.attention[self.boolWindow.currentIndex]) #this image item is updated with where the rodent is looking
+        self.attention = getAttention(self)
+        self.attention_im = pg.ImageItem(self.attention[self.boolWindow.currentIndex]) #this image item is updated with where the rodent is looking
         self.attention_im.setCompositionMode(QPainter.CompositionMode_Plus)
         self.boolWindow.imageview.addItem(self.attention_im)
-        self.attentionHeatMap=show(np.mean(self.attention,0))
+        self.attentionHeatMap = show(np.mean(self.attention,0))
         
     def closeEvent(self, event):
         if self.analysisDone:
@@ -170,30 +175,30 @@ class RodentTracker(QWidget):
         event.accept() # let the window close
         
 class AnalyzeThread(QThread):
-    finishedFrame=Signal(int)
-    finishedAllFrames=Signal()
+    finishedFrame = QtCore.Signal(int)
+    finishedAllFrames = QtCore.Signal()
     def __init__(self,bodyLines,nosePoints,movie,centers):
         QThread.__init__(self)
-        self.bodyLines=bodyLines
-        self.nosePoints=nosePoints
-        self.movie=movie
-        self.centers=centers
+        self.bodyLines = bodyLines
+        self.nosePoints = nosePoints
+        self.movie = movie
+        self.centers = centers
     def run(self):
-        self.angle=None
+        self.angle = None
         for t in np.arange(len(self.movie)):
-            image=self.movie[t]
-            self.bodyLines[t],self.angle, self.centers[t]=getLine(image,self.angle)
+            image = self.movie[t]
+            self.bodyLines[t],self.angle, self.centers[t] = getLine(image,self.angle)
             self.finishedFrame.emit(t)
-        self.nosePoints[0]=getFirstNosePoint(self.movie[0],self.bodyLines[0])
+        self.nosePoints[0] = getFirstNosePoint(self.movie[0],self.bodyLines[0])
         for t in np.arange(1,len(self.movie)):
-            self.nosePoints[t]=getNosePoints(self.bodyLines[t],self.nosePoints[t-1])
+            self.nosePoints[t] = getNosePoints(self.bodyLines[t],self.nosePoints[t-1])
         self.finishedAllFrames.emit()
         return
 
 
 
 def pts2line(pts):
-    line=list(pts[0].coords)
+    line = list(pts[0].coords)
     for i in np.arange(1,len(pts)):
         line.extend(pts[i].coords)
     return LineString(line)
@@ -201,41 +206,41 @@ def getMeanDistance(line,pts):
     return np.mean(np.array([line.distance(pt) for pt in pts]))
 
 def crop_line(line,pts_array):
-    line_start,line_end=list(line.coords)
-    line_start=Point(line_start); line_end=Point(line_end)
-    x=(line_start.x-line_end.x)/line.length
-    y=(line_start.y-line_end.y)/line.length
-    center=line.centroid
-    pts=pts_array-np.array([center.x,center.y])
-    pts=pts[:,0]*x+pts[:,1]*y
-    return pts2line([translate(center,xoff=(np.min(pts)*x), yoff=np.min(pts)*y),translate(center,xoff=(np.max(pts)*x), yoff=np.max(pts)*y)])
+    line_start,line_end = list(line.coords)
+    line_start = Point(line_start); line_end = Point(line_end)
+    x = (line_start.x-line_end.x)/line.length
+    y = (line_start.y-line_end.y)/line.length
+    center = line.centroid
+    pts = pts_array-np.array([center.x,center.y])
+    pts = pts[:,0]*x+pts[:,1]*y
+    return pts2line([translate(center,xoff = (np.min(pts)*x), yoff = np.min(pts)*y),translate(center,xoff = (np.max(pts)*x), yoff = np.max(pts)*y)])
 def err(p,coor,pts,pt):
-    line=LineString([coor[0]+p[0]*(coor[1]-coor[0]),pt])
-    distance=[line.distance(pt) for pt in pts]
+    line = LineString([coor[0]+p[0]*(coor[1]-coor[0]),pt])
+    distance = [line.distance(pt) for pt in pts]
     return distance
 def line2vector(line):
-    start,end=list(line.coords)
-    start=np.array(start); end=np.array(end);
-    v=end-start
-    v/=np.sqrt(np.sum(np.square(v)))
+    start,end = list(line.coords)
+    start = np.array(start); end = np.array(end);
+    v = end-start
+    v /= np.sqrt(np.sum(np.square(v)))
     return v
 def multidim_intersect(A, B):
     nrows, ncols = A.shape
-    dtype={'names':['f{}'.format(i) for i in range(ncols)],
+    dtype = {'names':['f{}'.format(i) for i in range(ncols)],
            'formats':ncols * [A.dtype]}
     C = np.intersect1d(A.view(dtype), B.view(dtype))
     C = C.view(A.dtype).reshape(-1, ncols) 
     return C
 def getMeanPoint(outer_axis,inner_axis,pts_array):
-    poly=np.array([p for p in inner_axis.coords]+[p for p in reversed(outer_axis.coords)])
-    rr, cc = polygon(poly[:, 0], poly[:, 1])
-    box_array=np.column_stack((rr,cc))
-    pts_inside=multidim_intersect(pts_array,box_array)
-    x,y=line2vector(outer_axis)
-    center=outer_axis.centroid
-    pts_shifted=pts_inside-np.array([center.x,center.y])
-    pts_mean=np.mean(pts_shifted[:,0]*x+pts_shifted[:,1]*y)
-    new_pt=translate(center,xoff=pts_mean*x, yoff=pts_mean*y)
+    poly = np.array([p for p in inner_axis.coords]+[p for p in reversed(outer_axis.coords)])
+    rr, cc  =  polygon(poly[:, 0], poly[:, 1])
+    box_array = np.column_stack((rr,cc))
+    pts_inside = multidim_intersect(pts_array,box_array)
+    x,y = line2vector(outer_axis)
+    center = outer_axis.centroid
+    pts_shifted = pts_inside-np.array([center.x,center.y])
+    pts_mean = np.mean(pts_shifted[:,0]*x+pts_shifted[:,1]*y)
+    new_pt = translate(center,xoff = pts_mean*x, yoff = pts_mean*y)
     return new_pt
 
 
@@ -252,132 +257,132 @@ def getLine(image,angle=None):
     7) Draw a box around the end segment of the line.  The bounds for the box lie parallel and perpendicular to this segment.  Fixing the inner point and allowing the end point to vary, fit the segment so that the average distance from the segment to the points in the box are a minimum. This step is done for both ends of the line, because we don't as yet know which end is the head and which is the tail.
     
     """
-    pts=np.where(image)
-    pts_array=np.column_stack((pts[0],pts[1]))
-    pts=MultiPoint([(pts[0][i],pts[1][i]) for i in np.arange(len(pts[0]))])
+    pts = np.where(image)
+    pts_array = np.column_stack((pts[0],pts[1]))
+    pts = MultiPoint([(pts[0][i],pts[1][i]) for i in np.arange(len(pts[0]))])
     # STEP 1
-    x0,y0=center_of_mass(image)
-    center=Point(x0,y0)
-    bounds=pts.bounds
-    b_len=((bounds[2]-bounds[0])**2+(bounds[3]-bounds[1])**2)**(1/2) #this is the length of the diagonal, the maximum possible length of an object inside a box
+    x0,y0 = center_of_mass(image)
+    center = Point(x0,y0)
+    bounds = pts.bounds
+    b_len = ((bounds[2]-bounds[0])**2+(bounds[3]-bounds[1])**2)**(1/2) #this is the length of the diagonal, the maximum possible length of an object inside a box
     # STEP 2
-    line=pts2line([translate(center,b_len),translate(center,-b_len)])
+    line = pts2line([translate(center,b_len),translate(center,-b_len)])
     # STEP 3
     if angle is None:
-        angles=np.arange(-90,90,10)
+        angles = np.arange(-90,90,10)
     else:
-        angles=np.arange(angle-20,angle+20,10) #this assumes the angle changes at most 10 degrees between frames
-    distances=np.zeros(angles.shape,dtype=np.float)
+        angles = np.arange(angle-20,angle+20,10) #this assumes the angle changes at most 10 degrees between frames
+    distances = np.zeros(angles.shape,dtype = np.float)
     for i in np.arange(len(angles)):
-        distances[i]=getMeanDistance(rotate(line,angles[i]),pts)
-    angle=angles[np.argmin(distances)]
-    line=rotate(line,angle)
-    line=crop_line(line,pts_array)
+        distances[i] = getMeanDistance(rotate(line,angles[i]),pts)
+    angle = angles[np.argmin(distances)]
+    line = rotate(line,angle)
+    line = crop_line(line,pts_array)
     
     # STEP 4 & 5
     # now that we have the approximate line down the main axis, let's divide it in half and allow the endpoints and midpoint to be translated along the perpendicular axis
-    start,end=list(line.coords)
-    start=np.array(start); end=np.array(end)
-    mid=(start+end)/2
-    mid_axis=rotate(line,90)
-    mid_axis=crop_line(mid_axis,pts_array)
-    axis1=translate(mid_axis,xoff=start[0]-mid[0],yoff=start[1]-mid[1])
-    axis2=translate(mid_axis,xoff=(start[0]-mid[0])/(4./3),yoff=(start[1]-mid[1])/(4./3.))
-    axis3=translate(mid_axis,xoff=(start[0]-mid[0])/2,yoff=(start[1]-mid[1])/2.)
-    axis4=translate(mid_axis,xoff=(end[0]-mid[0])/2,yoff=(end[1]-mid[1])/2)
-    axis5=translate(mid_axis,xoff=(end[0]-mid[0])/(4./3.),yoff=(end[1]-mid[1])/(4./3.))
-    axis6=translate(mid_axis,xoff=end[0]-mid[0],yoff=end[1]-mid[1])
+    start,end = list(line.coords)
+    start = np.array(start); end = np.array(end)
+    mid = (start+end)/2
+    mid_axis = rotate(line,90)
+    mid_axis = crop_line(mid_axis,pts_array)
+    axis1 = translate(mid_axis,xoff = start[0]-mid[0],yoff = start[1]-mid[1])
+    axis2 = translate(mid_axis,xoff = (start[0]-mid[0])/(4./3),yoff = (start[1]-mid[1])/(4./3.))
+    axis3 = translate(mid_axis,xoff = (start[0]-mid[0])/2,yoff = (start[1]-mid[1])/2.)
+    axis4 = translate(mid_axis,xoff = (end[0]-mid[0])/2,yoff = (end[1]-mid[1])/2)
+    axis5 = translate(mid_axis,xoff = (end[0]-mid[0])/(4./3.),yoff = (end[1]-mid[1])/(4./3.))
+    axis6 = translate(mid_axis,xoff = end[0]-mid[0],yoff = end[1]-mid[1])
     
     # STEP 6
-    pt1=getMeanPoint(axis1,axis2,pts_array)
-    pt2=getMeanPoint(axis2,axis3,pts_array)
-    pt3=getMeanPoint(axis3,mid_axis,pts_array)
-    pt4=getMeanPoint(axis4,mid_axis,pts_array)
-    pt5=getMeanPoint(axis5,axis4,pts_array)
-    pt6=getMeanPoint(axis6,axis5,pts_array)
+    pt1 = getMeanPoint(axis1,axis2,pts_array)
+    pt2 = getMeanPoint(axis2,axis3,pts_array)
+    pt3 = getMeanPoint(axis3,mid_axis,pts_array)
+    pt4 = getMeanPoint(axis4,mid_axis,pts_array)
+    pt5 = getMeanPoint(axis5,axis4,pts_array)
+    pt6 = getMeanPoint(axis6,axis5,pts_array)
     
     # STEP 7
-    start=pt1.coords[0]
-    end=pt2.coords[0]
-    headLine=LineString([start,end])
-    headLine=scale(headLine,2,2)
-    start=np.array(start); end=np.array(end)
-    mid=(start+end)/2
-    mid_axis=rotate(headLine,90)
-    axis1=translate(mid_axis,xoff=(start[0]-mid[0])*2,yoff=(start[1]-mid[1])*2)
-    axis2=translate(mid_axis,xoff=end[0]-mid[0],yoff=end[1]-mid[1])
+    start = pt1.coords[0]
+    end = pt2.coords[0]
+    headLine = LineString([start,end])
+    headLine = scale(headLine,2,2)
+    start = np.array(start); end = np.array(end)
+    mid = (start+end)/2
+    mid_axis = rotate(headLine,90)
+    axis1 = translate(mid_axis,xoff = (start[0]-mid[0])*2,yoff = (start[1]-mid[1])*2)
+    axis2 = translate(mid_axis,xoff = end[0]-mid[0],yoff = end[1]-mid[1])
     #poly=Polygon([p for p in axis1.coords]+[p for p in reversed(axis2.coords)]) #draws a box around one half of the mouse
     #pts_inside=MultiPoint([pt for pt in pts if poly.contains(pt)])
-    poly=np.array([p for p in axis1.coords]+[p for p in reversed(axis2.coords)])
+    poly = np.array([p for p in axis1.coords]+[p for p in reversed(axis2.coords)])
     rr, cc = polygon(poly[:, 0], poly[:, 1])
-    box_array=np.column_stack((rr,cc))
-    pts_inside=multidim_intersect(pts_array,box_array)
-    if len(pts_inside)==0: #this only happens when the object lies completely outside of the box at the end of the line
-        pts_inside=pts_array 
-    pts_inside=MultiPoint([tuple(p) for p in pts_inside])
+    box_array = np.column_stack((rr,cc))
+    pts_inside = multidim_intersect(pts_array,box_array)
+    if len(pts_inside) == 0: #this only happens when the object lies completely outside of the box at the end of the line
+        pts_inside = pts_array
+    pts_inside = MultiPoint([tuple(p) for p in pts_inside])
     
-    coor=np.array([np.array(s) for s in axis1.coords])
-    pt=end
-    p0=(.5,)
-    bounds=[(0.0,1.0)]
-    p, cov_x, infodic, mesg, ier = leastsqbound(err, p0,args=(coor,pts_inside,pt),bounds = bounds,ftol=.1, full_output=True)     
-    headLine=LineString([coor[0]+p[0]*(coor[1]-coor[0]),pt])
-    headLine=crop_line(headLine,np.array([np.array([p.x,p.y]) for p in pts_inside]))
-    pt1=Point(headLine.coords[1])
+    coor = np.array([np.array(s) for s in axis1.coords])
+    pt = end
+    p0 = (.5,)
+    bounds = [(0.0,1.0)]
+    p, cov_x, infodic, mesg, ier = leastsqbound(err, p0,args=(coor,pts_inside,pt),bounds = bounds,ftol=.1, full_output=True)
+    headLine = LineString([coor[0]+p[0]*(coor[1]-coor[0]),pt])
+    headLine = crop_line(headLine,np.array([np.array([p.x,p.y]) for p in pts_inside]))
+    pt1 = Point(headLine.coords[1])
     
-    start=pt6.coords[0]
-    end=pt5.coords[0]
-    headLine=LineString([start,end])
-    headLine=scale(headLine,2,2)
-    start=np.array(start); end=np.array(end)
-    mid=(start+end)/2
-    mid_axis=rotate(headLine,90)
-    axis1=translate(mid_axis,xoff=(start[0]-mid[0])*2,yoff=(start[1]-mid[1])*2)
-    axis2=translate(mid_axis,xoff=end[0]-mid[0],yoff=end[1]-mid[1])
+    start = pt6.coords[0]
+    end = pt5.coords[0]
+    headLine = LineString([start,end])
+    headLine = scale(headLine,2,2)
+    start = np.array(start); end = np.array(end)
+    mid = (start+end)/2
+    mid_axis = rotate(headLine,90)
+    axis1 = translate(mid_axis,xoff = (start[0]-mid[0])*2,yoff = (start[1]-mid[1])*2)
+    axis2 = translate(mid_axis,xoff = end[0]-mid[0],yoff = end[1]-mid[1])
     
-    #poly=Polygon([p for p in axis1.coords]+[p for p in reversed(axis2.coords)]) #draws a box around one half of the mouse
-    #pts_inside=MultiPoint([pt for pt in pts if poly.contains(pt)])
+    #poly = Polygon([p for p in axis1.coords]+[p for p in reversed(axis2.coords)]) #draws a box around one half of the mouse
+    #pts_inside = MultiPoint([pt for pt in pts if poly.contains(pt)])
     
-    poly=np.array([p for p in axis1.coords]+[p for p in reversed(axis2.coords)])
+    poly = np.array([p for p in axis1.coords]+[p for p in reversed(axis2.coords)])
     rr, cc = polygon(poly[:, 0], poly[:, 1])
-    box_array=np.column_stack((rr,cc))
-    pts_inside=multidim_intersect(pts_array,box_array)
-    if len(pts_inside)==0: #this only happens when the object lies completely outside of the box at the end of the line
-        pts_inside=pts_array 
-    pts_inside=MultiPoint([tuple(p) for p in pts_inside])
+    box_array = np.column_stack((rr,cc))
+    pts_inside = multidim_intersect(pts_array,box_array)
+    if len(pts_inside) == 0: #this only happens when the object lies completely outside of the box at the end of the line
+        pts_inside = pts_array
+    pts_inside = MultiPoint([tuple(p) for p in pts_inside])
     
     
     
-    coor=np.array([np.array(s) for s in axis1.coords])
-    pt=end
-    p0=(.5,)
-    bounds=[(0.0,1.0)]
+    coor = np.array([np.array(s) for s in axis1.coords])
+    pt = end
+    p0 = (.5,)
+    bounds = [(0.0,1.0)]
     p, cov_x, infodic, mesg, ier = leastsqbound(err, p0,args=(coor,pts_inside,pt),bounds = bounds,ftol=.1, full_output=True)     
-    headLine=LineString([coor[0]+p[0]*(coor[1]-coor[0]),pt])
-    headLine=crop_line(headLine,np.array([np.array([p.x,p.y]) for p in pts_inside]))
-    pt6=Point(headLine.coords[1])
+    headLine = LineString([coor[0]+p[0]*(coor[1]-coor[0]),pt])
+    headLine = crop_line(headLine,np.array([np.array([p.x,p.y]) for p in pts_inside]))
+    pt6 = Point(headLine.coords[1])
     
-    line=pts2line([pt1,pt2,pt3,pt4,pt5,pt6])
+    line = pts2line([pt1,pt2,pt3,pt4,pt5,pt6])
     return line, angle, center
 
 
 
 
 def getFirstNosePoint(image,line):
-    pts=np.where(image)
-    pts=MultiPoint([(pts[0][i],pts[1][i]) for i in np.arange(len(pts[0]))])
-    line_pts=list(line.coords)
-    start_line=LineString([line_pts[0],line_pts[1]])
-    end_line=LineString([line_pts[-1],line_pts[-2]])
+    pts = np.where(image)
+    pts = MultiPoint([(pts[0][i],pts[1][i]) for i in np.arange(len(pts[0]))])
+    line_pts = list(line.coords)
+    start_line = LineString([line_pts[0],line_pts[1]])
+    end_line = LineString([line_pts[-1],line_pts[-2]])
     if getMeanDistance(start_line,pts)<getMeanDistance(end_line,pts):
-        nose=Point(line_pts[0])
+        nose = Point(line_pts[0])
     else:
-        nose=Point(line_pts[-1])
+        nose = Point(line_pts[-1])
     return nose
 
 def getNosePoints(line,prevPoint):
-        start=Point(line.coords[0])
-        end=Point(line.coords[-1])
+        start = Point(line.coords[0])
+        end = Point(line.coords[-1])
         if start.distance(prevPoint)<end.distance(prevPoint):
             return start
         else:
@@ -389,20 +394,17 @@ def watch_video():
     url = 'https://youtu.be/y4IcD8Sv5Zg'
     QDesktopServices.openUrl(QUrl(url))
 
-if __name__ == '__main__':
-    from skimage.io import imread, imsave
-    movie=imread('D:\\Desktop\\bwmouse.tif',plugin='tifffile').astype(np.float64)
-    movie=np.squeeze(movie) #this gets rid of the meaningless 4th dimention in .stk files
-    movie=np.transpose(movie,(0,2,1)) # This keeps the x and y the same as in FIJI. 
-    angle=30
-    nFrames=len(movie)
-    bodyLines=[None]*nFrames
-    nosePoints=[None]*nFrames
-    for t in np.arange(0,10):
-        image=movie[t]
-        bodyLines[t],angle=getLine(image,angle)
-    nosePoints[0]=getFirstNosePoint(movie[0],bodyLines[0])
 
+def run_demo():
+    from flika import open_file, zproject, image_calculator, gaussian_blur, threshold, remove_small_blobs
+    test_file = os.path.join(os.path.dirname(__file__), 'test', 't1_1.tif')
+    original = open_file()
+    median = zproject(0, original.mt, 'Median', keepSourceWindow=True)
+    image_calculator(original, median, 'Subtract')
+    gaussian_blur(2)
+    threshold(-10, darkBackground=True)
+    remove_small_blobs(2, 1000)
+    launchRodentTracker()
     
 
 
