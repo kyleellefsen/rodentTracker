@@ -1,16 +1,10 @@
 <plugin name="Rodent Tracker">
-	<base_dir>
-		rodentTracker
-	</base_dir>
-	<date>
-		02/10/2016
-	</date>
+	<version>
+		2017.03.20
+	</version>
 	<author>
 		Kyle Ellefsen
 	</author>
-	<description>
-		A Flika plugin for behavior analysis of rodents.
-	</description>
 	<url>
 		https://github.com/kyleellefsen/rodentTracker/archive/master.zip
 	</url>
