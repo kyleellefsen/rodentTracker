@@ -1,4 +1,7 @@
 <plugin name="Rodent Tracker">
+	<directory>
+        rodentTracker
+    </directory>
 	<version>
 		2017.03.20
 	</version>
