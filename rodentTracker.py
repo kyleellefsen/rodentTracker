@@ -398,7 +398,7 @@ def watch_video():
 def run_demo():
     from flika import open_file, zproject, image_calculator, gaussian_blur, threshold, remove_small_blobs
     test_file = os.path.join(os.path.dirname(__file__), 'test', 't1_1.tif')
-    original = open_file()
+    original = open_file(test_file)
     median = zproject(0, original.mt, 'Median', keepSourceWindow=True)
     image_calculator(original, median, 'Subtract')
     gaussian_blur(2)
