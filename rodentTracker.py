@@ -21,14 +21,12 @@ from distutils.version import StrictVersion
 from .attention import getAttention
 
 import flika
-try:
-    flika_version = flika.__version__
-except AttributeError:
-    flika_version = '0.0.0'
-if StrictVersion(flika_version) < StrictVersion('0.1.0'):
-    import global_vars as g
-else:
-    from flika import global_vars as g
+from flika import global_vars as g
+from flika.window import Window
+from flika.roi import ROI_rectangle, makeROI
+from flika.process.file_ import open_file
+from flika.utils.misc import open_file_gui, save_file_gui
+from flika.process import *
 
 
 
@@ -396,7 +394,6 @@ def watch_video():
 
 
 def run_demo():
-    from flika import open_file, zproject, image_calculator, gaussian_blur, threshold, remove_small_blobs
     test_file = os.path.join(os.path.dirname(__file__), 'test', 't1_1.tif')
     original = open_file(test_file)
     median = zproject(0, original.mt, 'Median', keepSourceWindow=True)
