@@ -6,6 +6,25 @@ Created on Tue Aug 05 15:41:02 2014
 """
 import numpy as np
 import os
+import sys
+from typing import List, Union
+
+# Patch for numpy.dual for leastsqbound compatibility
+if not hasattr(np, 'dual'):
+    # Create the dual module if it doesn't exist
+    class NumpyDualModule:
+        def __init__(self):
+            pass
+        
+        @property
+        def inv(self):
+            return np.linalg.inv
+
+    # Add the module to numpy
+    np.dual = NumpyDualModule()
+    # Also make it available in sys.modules so it can be imported directly
+    sys.modules['numpy.dual'] = np.dual
+
 from qtpy.QtWidgets import *
 from qtpy.QtGui import *
 from qtpy.QtCore import *
@@ -17,8 +36,8 @@ from shapely.geometry import Point, LineString, MultiPoint, Polygon
 from skimage.draw import polygon
 from shapely.affinity import translate, rotate, scale
 from leastsqbound import leastsqbound
-from distutils.version import StrictVersion
 from .attention import getAttention
+from typing import List
 
 import flika
 from flika import global_vars as g
@@ -71,7 +90,7 @@ class RodentTracker(QWidget):
             if g.m.currentWindow is None:
                 self.setStatus("You must select a window before running the Rodent Tracker")
                 return
-            if set(np.unique(g.m.currentWindow.image.astype(np.int)))!=set([0,1]): #tests if image is not boolean
+            if set(np.unique(g.m.currentWindow.image.astype(int)))!=set([0,1]): #tests if image is not boolean
                 self.setStatus('The Rodent Tracker only accepts boolean windows as input.  Select a boolean window.')
                 return
             self.boolWindow=g.m.currentWindow
@@ -95,20 +114,20 @@ class RodentTracker(QWidget):
         self.analyzeThread.start()
     def setStatus(self,status):
         self.status.setText(str(status))
-    def draw(self,thing):
+    def draw(self, thing):
         if type(thing) is Point:
-            pos=list(thing.coords)
-            self.scatter.setPoints(pos=pos)
+            pos = list(thing.coords)
+            self.scatter.setData(pos=pos)
         if type(thing) is LineString:
-            points=list(thing.coords)
-            path=QPainterPath(QPointF(*points[0]))
-            for i in np.arange(1,len(points)):
+            points = list(thing.coords)
+            path = QPainterPath(QPointF(*points[0]))
+            for i in np.arange(1, len(points)):
                 path.lineTo(QPointF(*points[i]))
             self.pathitem.setPath(path)
         if type(thing) is Polygon:
-            points=list(thing.exterior.coords)
-            path=QPainterPath(QPointF(*points[0]))
-            for i in np.arange(1,len(points)):
+            points = list(thing.exterior.coords)
+            path = QPainterPath(QPointF(*points[0]))
+            for i in np.arange(1, len(points)):
                 path.lineTo(QPointF(*points[i]))
             self.pathitem.setPath(path)
     def updateTime(self,t):
@@ -200,8 +219,18 @@ def pts2line(pts):
     for i in np.arange(1,len(pts)):
         line.extend(pts[i].coords)
     return LineString(line)
-def getMeanDistance(line,pts):
-    return np.mean(np.array([line.distance(pt) for pt in pts]))
+
+def getMeanDistance(line: LineString, pts: MultiPoint) -> float:
+    """Calculate mean distance from a line to points in a MultiPoint object.
+    
+    Args:
+        line: The LineString to measure distances from
+        pts: MultiPoint object containing the points to measure to
+        
+    Returns:
+        Mean distance as a float
+    """
+    return np.mean(np.array([line.distance(pt) for pt in pts.geoms]))
 
 def crop_line(line,pts_array):
     line_start,line_end = list(line.coords)
@@ -212,9 +241,27 @@ def crop_line(line,pts_array):
     pts = pts_array-np.array([center.x,center.y])
     pts = pts[:,0]*x+pts[:,1]*y
     return pts2line([translate(center,xoff = (np.min(pts)*x), yoff = np.min(pts)*y),translate(center,xoff = (np.max(pts)*x), yoff = np.max(pts)*y)])
-def err(p,coor,pts,pt):
-    line = LineString([coor[0]+p[0]*(coor[1]-coor[0]),pt])
-    distance = [line.distance(pt) for pt in pts]
+def err(p: np.ndarray, coor: np.ndarray, pts: Union[MultiPoint, 'GeometrySequence'], pt: tuple) -> List[float]:
+    """Calculate distances from a line to each point in a MultiPoint or GeometrySequence.
+    
+    Args:
+        p: Parameter array (typically containing a single value)
+        coor: Coordinates array 
+        pts: MultiPoint object or GeometrySequence containing the points to measure distances to
+        pt: End point of the line
+        
+    Returns:
+        List of distances from line to each point
+    """
+    line = LineString([coor[0]+p[0]*(coor[1]-coor[0]), pt])
+    
+    # Check if pts is a MultiPoint (has .geoms) or already a GeometrySequence
+    if hasattr(pts, 'geoms'):
+        distance = [line.distance(pt) for pt in pts.geoms]
+    else:
+        # pts is already a sequence of geometries
+        distance = [line.distance(pt) for pt in pts]
+    
     return distance
 def line2vector(line):
     start,end = list(line.coords)
@@ -270,7 +317,7 @@ def getLine(image,angle=None):
         angles = np.arange(-90,90,10)
     else:
         angles = np.arange(angle-20,angle+20,10) #this assumes the angle changes at most 10 degrees between frames
-    distances = np.zeros(angles.shape,dtype = np.float)
+    distances = np.zeros(angles.shape, dtype=float)
     for i in np.arange(len(angles)):
         distances[i] = getMeanDistance(rotate(line,angles[i]),pts)
     angle = angles[np.argmin(distances)]
@@ -323,9 +370,9 @@ def getLine(image,angle=None):
     pt = end
     p0 = (.5,)
     bounds = [(0.0,1.0)]
-    p, cov_x, infodic, mesg, ier = leastsqbound(err, p0,args=(coor,pts_inside,pt),bounds = bounds,ftol=.1, full_output=True)
+    p, cov_x, infodic, mesg, ier = leastsqbound(err, p0,args=(coor,pts_inside.geoms,pt),bounds = bounds,ftol=.1, full_output=True)
     headLine = LineString([coor[0]+p[0]*(coor[1]-coor[0]),pt])
-    headLine = crop_line(headLine,np.array([np.array([p.x,p.y]) for p in pts_inside]))
+    headLine = crop_line(headLine, np.array([np.array([p.x, p.y]) for p in pts_inside.geoms]))
     pt1 = Point(headLine.coords[1])
     
     start = pt6.coords[0]
@@ -355,9 +402,9 @@ def getLine(image,angle=None):
     pt = end
     p0 = (.5,)
     bounds = [(0.0,1.0)]
-    p, cov_x, infodic, mesg, ier = leastsqbound(err, p0,args=(coor,pts_inside,pt),bounds = bounds,ftol=.1, full_output=True)     
+    p, cov_x, infodic, mesg, ier = leastsqbound(err, p0,args=(coor,pts_inside.geoms,pt),bounds = bounds,ftol=.1, full_output=True)     
     headLine = LineString([coor[0]+p[0]*(coor[1]-coor[0]),pt])
-    headLine = crop_line(headLine,np.array([np.array([p.x,p.y]) for p in pts_inside]))
+    headLine = crop_line(headLine, np.array([np.array([p.x, p.y]) for p in pts_inside.geoms]))
     pt6 = Point(headLine.coords[1])
     
     line = pts2line([pt1,pt2,pt3,pt4,pt5,pt6])
